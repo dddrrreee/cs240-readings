@@ -1,0 +1,311 @@
+*************************************************************************
+*************************************************************************
+*************************************************************************
+*************************************************************************
+*
+*  Mesa Notes.
+*
+*
+*
+what can you say about paper?
+	- 20 years ago we wtill read.
+	- lots of citations ot other people.  schlarly.  including papers
+	  we will read
+	- turing award winner.
+	- beautifully written.
+
+   experience paper: no real numbers, doesn't introduce ideas, lays out
+   design decisions.   the "hard evidence" is the least useful part of
+   the paper (experience in real systems, the numbers are mostly curios)
+
+How environment different?
+	in the same address space.
+	cooperative.
+	not time sliced.
+	microcoded instructions
+	weird stack.
+
+-----------------------------------------------------------------
+  using the following code:
+     -----------------------------------------
+	int sem;
+	condition non_zero;
+
+	P()
+		if(!sem)
+			wait(non_zero);
+		sem--;
+
+	V()
+		sem++;
+		notify(non_zero);
+
+	will_block()
+		return sem != 0;
+     -------------------------------------------
+      monitor:
+	- code + data + synch.  written next to each other.
+
+	- data (sem) can only be modified by monitor itself.
+
+		difference between monitor and module: 2 bytes of data
+		and 2 bytes of code.  what is the code?  what is the data?
+		(data is lock structure: seems to have 1 bit for a lock,
+		and 15 bits for the tail.  so there can be 2^15 bytes
+		of pointers).
+
+	- types of routines:
+		entry: can be called from outside.  acq/rel lock.
+			procedure -> entry adds 8 bytes of code.
+			monitorentry, monitorexit, not sure what the
+			other is...
+
+		internal: called only from inside.  no acq/rel.
+
+		external: does not acquire lock.  Why? are these just
+		   speed hacks or is there some correctness?  cannot
+		   wait, cannot call internal routines.
+
+		guesses as to why wait adds 12 bytes of code?  probably
+		includes inline queue manipulation, including a check.
+
+        how many queues in this code?
+		- one for monitor lock, one for condition variable.
+
+	- all the ways to get switched out in this code?
+		- return
+		- wait()
+		- another thread becomes higher priority: scheduler
+		  switches us out at any point.
+
+             -------------
+		- generate an exception that you handle: will not be
+		  released if you return without handling exception!
+
+	what is a notify going to do mechanically?  pull something
+	from the head, if anything.  broadcast puts everyone on the
+	ready queue.
+
+	lock [can figure out from table]
+		struct {
+			lock;
+			queue *tail;
+		};
+
+	condition variable:
+		can be broadcast or notified.
+
+		struct {
+			queue *tail;
+			int timeout;
+			int wakeup-waiting-switch;
+		};
+
+	process 
+		thread of control
+		can be joined, or detached.
+
+		contains: stack of frames, plus a 10 byte descriptor
+		(ProcessState: kept in a fixed located table; size determines
+		the maximum).
+
+		runs on a frame: frames seem to grow pretty weirdly.  taken
+		from a heap, rather than pushed/popped.  why is that?
+
+
+	* when are switched?   
+			wait on lock on entry.
+			someone else becomes higher priority
+			wait on condition.
+			possibly when you do a notify, waking up a higher
+				priority thread.
+
+			*no timesliceing* means what? [ entirely driven 
+			by when process relinquishes, or makes another
+			guy have a higher priority.]
+
+	* woken up : how?
+			- notify (cond);
+			- timeout -- associated with each condition variable.
+			- abort[p]: pass process descriptor.
+			- broadcsat(cond): wake up everone.
+
+			- can do arbitrary wakeups at arbitrary points and 
+			  they should work correctly.
+
+
+	* wait:
+		- releases lock of containing monitor.
+		- does not not release locks above.
+
+	* notify:
+		* does not release control of monitor lock
+
+		- puts notified thread, if any on ready queue.
+
+		- hoare: switch immediately.  know that whatever was being
+		  signalled is done.
+
+		  mesa: resume at some convenient time.  nice feature: can
+		  replace with broadcast, which allows easier reasoning.
+
+		"verification is actually made simpler and more
+		localized." p 11  why?
+
+		How does having mesa-style monitor semantics actuall
+		help things?  [Correct can always be woken up, even
+		when not necessary.]
+
+		* naked notify: outside of monitor.  what is the problem?
+			what is an alternative?
+		 	
+		what happens if we signal a higher priority process?
+			- sucks: put on ready queue, will preempt us,
+			will block on lock, will wake us back up.
+
+	* scheduler: premptive between priorities, fifo within.
+--------------------------------------------------------------------------
+what are all the queues in the system?
+
+    one central ready queueu, and then one with each lock instance
+   (monitor lock, condition), and a fault queue.  the first pointer
+   is to the *tail*.  this lets you use one cell of storage to add	
+    processes to end, as well as cycling through.
+
+features of q?
+	- same priority, fast insertion, will be fifo
+	- high priority fast
+	- low priority fast
+	- take highest off queue fast
+		
+--------------------------------------------------------------------------
+What is a monitor invariant?
+
+	- just the abstract data structure invariant, but protected
+	against concurrency.
+
+   examples:
+
+	- that the availablestorage = the actual bytes.
+	- that some freelist actually holds freed data.
+	...
+
+
+-------------------------------------------------------------------------
+how is mesa the Right Thing?
+	- check every instruction
+
+	- have run queue logic in *hardware* (microcode)  not sure if 
+	  right thing or not.
+
+how New jersey?
+
+	- frequency of use -> put in hw rather than the most elegant partition
+	- wait semantics:  since it's a hint, what do they get out of it?
+		 can do caorse conditoins.
+
+	- the fact that they disable interrupts!
+	- why not have recursive monitors?  should preserve invariant.
+	- des not protect against dangling refs.
+	- the locks with clause: does not check that you do not modify 
+	  via aliasing.  how could you check?
+
+	- don't worry too much about fairness:   in a properly designed
+	  system there shouldn't be too many processes waiting for a lock.
+	- fixed size processState array.
+
+	- non-recursive locks.
+-------------------------------------------------------------------------
+Tradeoffs between eraser and mesa?
+	- eraser can find when you forget to wrap shared state in monitor.
+
+	- monitor does sugar of acquisition and release cleanly.
+
+	- limits what you can express --- have to do monitor.
+
+	- completely prevents classes of errors instead of kind of 
+	  finding them.  
+
+	- languade independent.
+
+	- prevents a larger class of race conditions: eraser ensures that you
+	  have same lock when you modify same variable.  will not prevent 
+	  you from doing something stupid.  do these look the same from the
+	  point of view of eraser?  do they have the same semantics?
+
+			lock(l);
+			x = x + 1;
+			unlock(l);
+
+			lock(l);
+			tmp = x + 1;
+			unlock(l);
+
+			lock(l);
+			x = tmp;
+			unlock(l);
+
+	- could make something an external that you really shouldn't.  
+-------------------------------------------------------------------------
+How can you deadlock?
+
+         -----------------------------------------------
+ entry foo(int x)
+	if(x) foo();
+         -----------------------------------------------
+
+ entry foo()    			entry bar()
+	bar();					foo();
+         -----------------------------------------------
+
+ entry foo()    			entry bar()
+	bar();					wait(c);
+
+  ------------------------------------------------------
+ entry foo()    			entry bar()
+	bar();					throw invalid;
+
+
+  fork foo();
+  fork foo();
+ 
+  what happens?  will go to debugger.  holds lock still held, second
+  one will deadlock.  why did they do this?  modularity!  otherwise return
+  with monitor invariant all screwed up.  
+
+  why don't they release the lock?
+	violates modularity: don't know if the person you are calling
+	could call you.
+
+-------------------------------------------------------------------------
+questions:
+
+what is a monitor invarient?
+
+Your ex-140 partner loudly declares that if the semantics of the
+``wakeup-waiting switch'' is good for naked notifies, it must be
+  good for normal notifies, which should be replaced with them.  Can you
+  do this substitution and preserve correctness?  (List any assumptions
+  you must make.)
+
+     The replacement should have no effect for well-formed mesa
+     programs that use a while loop to recheck their wait condition.
+     Such programs will work (albeit possibly more slowly) even in the
+     presence of completely random wakeups.
+
+
+Would a Mesa programmer have any use for a Mesa version of Eraser?
+   To detect deadlock, to detect when you should be using a monitor.
+
+Give two examples where Mesa makes a ``New Jersey'' style decision.
+	Wakeup semantics.  No recursive monitors.   ``Locks with clause''
+	object not protected from modification.  Does not worry much
+	about fairness on locks ``in a properly designed system should
+	not be many processes waiting for locks.''
+
+Explain from the Mesa paper: ``...[while] any procedure
+suitable for forking can be called sequentially, the converse is not
+true.''
+
+	Uncaught exceptions in forked procedure causes system to go
+	to debugger.

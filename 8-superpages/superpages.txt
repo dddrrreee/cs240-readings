@@ -1,0 +1,456 @@
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+*
+*
+*  Superpage notes
+*
+*
+*
+*
+*
+
+
+first example of a modern experimental evaluation.  varied every possible
+parameter.  typical of peter: solid, careful papers.  not revolutionary
+but interesting and you can stand on them.  if you were going to build a
+superpage system you would read this paper.  just as with the mesa paper,
+or the eraser paper.
+
+very common type of OS paper: some pretty simple idea, goodness measured
+in terms of performance, huge amount of measurement.  typical improvements
+by community: arch (1-3%), compilers (5%), OS (20% or more).
+
+notice non-trend: still mostly english text, no formulas.  just 
+measure more.  so vms in this sense isn't much worse.
+
+grail: achieve high and sustained performance for real workloads and
+negligible degraation in pathological cases.
+	evaluated on real benchmarks
+	built in real system
+
+
+funny case where hw evolves faster than sw: superpages out for over
+a decade, but very little support in os.  primary maps framebuffer 
+using one big superpage (maybe OS as well).
+
+
+paper obsolete if hardware can (1) make big TLBs or (2) form superpages
+out of non-contig pages efficiently [fang et al].  if past=future then 
+they won't do (1) anytime soon.  not sure about (2).
+
+----------------------------------------------------------------------
++ fundamental assumption: do no harm.  should always be better, even
+  by sacrificing upside by taking less risks.  where can be worse?  (1)
+  general overhead, but they show not a problem; (2) paging decisions.
+  this is on place where it does seem that they could be screwed.
+
+  a huge amount of care is given to screw cases.  you are almost 
+  certain that if you use this, it will not blow up on some 
+  workload out in the lab.  have no such warm fuzzies about the vms
+  stuff.
+-------------------------------------------------------------------------
+thing to keep in mind: just mapping integers to integers.  
+	vpn -> ppn
+
+   most of the problems in the paper boil down to the fact that there is
+   no good way in general to construct an arbitrary int->int function.
+   if we want to map arbitrary ints to ints, then we fundamentally have
+   to use a brute force table.  ie.., O(n) space
+
+   quick OS proof: if its purely random, then its not compressible and
+   we need to record everything.
+ 
+   so the way we handle it is to induce structure (restrict flexibility)
+   so that we don't have to specify.  the way we always do in OS is to
+   force consequtive vpns to go to consequtive ppns.  segmentation,
+   pages (larger and larger more of this), superpage.
+
+-------------------------------------------------------------------------
+versus malloc and free
+
+similar degrees of freedom:
+	1. where to place: step through whre to place things?
+	2. when to coalese: can form back into big one.
+	3. what to split: which space do we break down.
+
+differences:
+	4. (different from malloc): when to move.
+	5. which physical you free
+	6. units very much larger.
+
+similar lack of control over:
+	1. size
+
+	2. request stream order (not completely true: can suspend program).
+
+	3. the virtual addresses (mostly: can chose mmap, or the initial
+	   place to map stack and such)
+
+	4. which/when virtual you free.
+
+
+
+placement:
+        worst place to put one block?
+                [leave largest free that you can: they sort of do this
+                 using best fit strategy]
+
+        populations of two different sizes?
+                [split on ends: could segregate memory [don't do]]
+
+        populations off a bunch of different sizes with correlated deaths?
+                [cluster together: all pages from same process [don't do]]
+                [their wired pages, seperate out: these cannot move at all]
+
+
+if you look at it as similar to malloc and free you notice a bunch of
+heuristics developed there that could work here.  you want to put things
+of same size in same place (all same size no frag); you want to put things
+that die at same time in sample place (e.g., bias alloc of all 
+stuff for same program in same place).  they don't do either.
+
+in general: large unit allows us to satisfy the largest number
+   of different.  don't split when a smaller one will do.  try to free
+   up big chunks at once.  in trouble when only small.
+------------------------------------------------------------------
+Do we care about the problem?
+
+   Figure 1 is our tragedy: log graph, with suckiness increasing
+   exponentially  (100x over 10 years).  this the the wrong end of
+   moore's law.  overheads of 30-60%.
+
+	- physically indexed cache: what is the problem?  cache *hits*
+	  can cause TLB *misses*.  wild.  
+
+	- so use a virtual cache.  what sucks?	(flush, aliasing,
+	  consistency) solve aliasing with hw or by forcing sw to
+	  map so it conflicts.  solve flush with asid.
+
+	- could have a two level TLB, but i don't know of anyone that
+	  does this.  given how much space wasted on BTBs, not clear
+	  you wouldn't want.
+   
+
+	- plausible worst case access pattern?  1 reference per page.
+	  which benchmark looks something like this?
+
+
+   mips?  64 * 4K = 256K!  tiny.
+
+   our simple solution to make the TLB go farther: just increase the
+   page size.  problem is internal frag.  so we allow increase of page
+   size across a set of ranges (fit it).  sort of like segmentation,
+   but much more restricted.
+
+Alpha:
+   two tlbs, one instruction, one data.   (128I+128D)*8K = 2MB.  in their
+	case 500MB, so factor of 250.  since multiGB.  easily factors
+	of 1000s.
+
+   (why put vpn at the top of the virtual address?)
+
+   8K, 64K, 512K, 4MB, where va % 64K = 0 for 64K superpage, etc.
+   why is it aligned?  [so that you can steal bits for the size without
+    needing a larger tlb.]
+
+good:
+	+ larger coverage
+bad:
+    artifacts:
+	- one ref bit
+	- one protection bit
+	- one modify bit
+	- aligned both at va and pa.
+
+
+
+    intrinsic:
+	- one reference makes whole thing refereneced.  bad positive
+	  correlation: larger it is, more likely it is to happen,
+	  more memory wasted.
+
+	- one write makes whole thing look modified.  bad positive
+	  correlation: larger it is, more likely to happen, more costly
+	  to write to disk.
+
+	- hard to allocate in a good way.
+
+	- costs more to write to disk (if you were more precise not bad?)
+	- less locality: pr that you use byte b0 and b1 decreases with
+	  distance.
+
+   + how much does a TLB miss cost?
+   + how many do we have per page fault?
+-------------------------------------------------------------------
+allocation (triggered on page fault)
+	- best: all of memory free
+	- worst: only 1 page free or scattered.
+	   [anytime contiguity important this is true: identical on disk]
+
+      basic tradeoff: greedy now or take long view.  in both cases don't
+	know future so may be wrong.  
+
+	- local view: want to put where it can grow the longest
+	- global view: don't want to waste 
+
+     their heuristics:
+	1. leave as much free space as possible.  (take from smallest
+	   part)
+	2. don't preclude future.
+	3. don't be worse than nothing.
+
+   how much to allocate?
+
+        - if we knew future: would make exactly as big as needed.
+
+	allocates exactly one base page, with the same alignment as the
+	faulted page, but reserve the following pages.	reservation size
+	is the largest superpage that is completely contained by object.
+	will promote to superpage when fully populated.  in the meantime
+	have a non-binding reservation.  free to take away, but will do
+	so in FIFO order.
+
+	how do you use up a reservation?  promotes gradually: as soon
+	as extent fully populated goes to the page.  this is an example
+	of the do no harm; works well in practice since often if you're
+	going to use, do so promptly (e.g., an array initialization).
+
+		in case of alpha: promotion = replicating exact same
+		PTE to all relevent PTEs.  TLB miss on any will bring
+		in the same entry.
+		
+   what to do if doesn't fit?  where does the reservation come from? 
+
+	1. freelist.
+
+  	2. if cannot get a reservation, preempt an existing one.
+  	sort reservation list by when you did a page allocation
+	(i.e., allocate page, put at end): LRU = take from head,
+	O(1).
+
+	3. if no more space: could copy, could flush things out; they
+	trigger the coalescing deamon.  (will talk about later).
+
+   rellocation:
+	1. can do because you know where pointer to relocated object
+	   (page) is and so can update them (i.e., modify page table).
+	   cannot do this with C & malloc since you don't know pointers.
+	
+	2. rellocation always interesting when you care about continuity.
+	   usually maps to some sort of mark and sweep garbage collector.
+	   called different things: defragmentation (disk), garbage
+	   collection (memory),  continuity recovery (superpages).
+
+   to steal some good ideas from malloc:
+	1. want to allocate things that will die at same time
+	   together: can allocate objects from same process next to
+	   each other.
+
+	2. want to allocate things that are the same size together
+	   (since no frag if die & allocate more of this size in future).
+	   could possibly do histogram computation to determine how
+	   big zone should be.
+
+	3. allocate things of same type together: (1) wired (they do),
+	   (2) file blocks (survive longer than process).
+
+     can either select from these in order, or use recursively.
+    
+-----------------------------------------------------------------------
+promote: want to grow it: how much and when?
+
+	- too early, will eat memory for nothing and someone else might
+	  have made better use.
+
+	- too late and something else might be there
+
+	+ does when entire range is populated.
+
+	if you need 56K do they allocate 64K?  
+	if you need 4MB - 8K do they allocate 4MB?
+
+	on alpha:
+		
+		a fully populated 512K region that goes to superpage
+		will have been populated by 7 64K superpages first.
+
+
+	observe: populate densely and early.
+
+demotion: (evication) exit or lose page:
+	1. occurs on eviction, recursively breaks down to largest
+	   smaller superpages.
+
+	2. under memory pressure: when deamon resets reference bit,
+	   demotes superpage to base pages and repromotes back only
+	   when all referenced.  (anything else?)
+
+	3. first write to a clean supepage shatters it.  only have one
+	   reference bit.	so don't know what parts are in use,
+	   so break down into a base
+	  page that holds the dirty one, and as large super pages as
+	  possible for the rest.
+
+	4. change permissions on subsuperpage.
+-----------------------------------------------------------------------
+they constantly avoid doing worse than nothing.  where could they
+do worse than a system without superpages?
+        - overhead (but doesn't seem so high)
+        - page eviction decisions: demote to get continuity, demote
+	  closed file pages.
+
+-----------------------------------------------------------------------
+how does evication work?
+   freebsd:
+		[- four lists: free, cache, clean, unmapped]
+        four lists:
+		- free (not said) pages that correspond to nothing.
+		- cache: clean and unmapped (file data).
+		- inactive: mapped into process but not referenced in a 
+		  while (dirty or clean)
+		- active: accessed receltly but may not have ref bit set
+
+   mem pressure: 
+	- moves clean inactive -> cache, 
+	- pages out dirty inactive
+      	- deactivates unreferenced pages from active list
+
+        modification: all clean pages backed by file moved to inactive
+	list as soon as all processes close file.  these will only be
+	picked up by the coalescing deamon.
+
+  reservations use both cache and free pages.  take free over cache.
+
+  deamon actived both under memory pressure and when continuity low.
+  (allocation fails: deamon walks over inactive list, moving to cache
+   pages that will make continuity to satisfy request!  don't move if
+   don't help.  stops when run out of list or made enough for all past
+   requests.  do no harm.)
+ 
+  downside: reused sooner than lru since contig.
+--------------------------------------------------------------------------
+experiments:
+	- best case, under stress, pathological.
+
+	+ huge set of standard applications, so you can't hide weaknesses.
+	+ very precise set of attacks on the system.
+
+	- real in that it runs on an actual system, but only done on that
+	  one system.  you'd expect things to work out well on others, but
+	  no real demonstration.
+
+	- missing numbers: what is the cost of a miss??
+	- what are the benchmark times in seconds?  cannot figure out if 
+	  it really matters without this.
+
+    6.3: best case: free memory plentifucl nonfrag, every attempt
+	to allocate succeeds and reservations not preempted
+
+	"is it worth doing at all?"
+
+
+	- mean elapsed time with warmup.  why warmup?  [want to remove 
+	  I/O effects -- could overstate superpage contribution.]
+
+	- many more base pages, but coverage mostly comes from large ones.
+	  (correlation in ratio to speedup?)
+		512 8K pages = 1 4MB.  so often have a factor of 80 or
+	   	so covered by the large page.
+
+	- why mesa slowdown? doesn't track zeroed out pages
+
+	- web has few big pages (allocates many small files so doesn't
+	   benefit)
+
+	- fftw has large number of huge pages (almost no speedup with < 4MB)
+
+	- matrix goes crazy: misses in tlb all over place:
+	  how one miss per two accesses? 
+
+	- the page coloring thing is a really good example of how careful
+	  they are.  could have easily turned this (witout realizing it)
+	  into a page coloring paper.    page color intuition: assume
+	  spatial locality.  make sure that close together thigns do	
+	  not conflict in cache.   64K VA will map to 64K PA range in low
+	  order bits.
+
+	- big problem: they never show runtimes.  70% in a short program
+	  probably don't care.
+
+    6.4 multiple page sizes: only allow single allcoation and compare
+	8K (base) + 1 superpage size.
+
+	- 13 out of 35 that had diff (the others didn't!)
+	- looks like 512KB gets ms of the benefit!
+	- doesn't measure space consumption so not full picture
+	- mcf doubles speed up when can chose between sizes
+	- fftw makes big diff. why?
+
+ 	- big problem:
+		their significant digits are nonsense.  alpha only
+		counts every 512K misses!  so for short programs this
+		can be n or n-1 easily, which makes a *2 digit* difference
+
+    6.5 handling frag
+	- run verous programs (grep, gcc, netscape) and within 15 minutes
+	  have sever frag: no region larger than 64K even though 360MB
+	  out of 512MB was free
+
+	- restore continuity using the deamon scheme
+
+	- cache coalese all cache pages (clean unmapped) - deamon (trys
+	to build up larger) by moving inactive to cache (coalescing)
+	andy by doing wired page segregation.  key: treats closed files
+	as inactive as opposed to old version which does not demote 
+	immediately from active->inactive.  if no memory pressure can
+	remain active!
+		measure impact: run webserver after this experiment
+		(i.e., when evictions have occured).  slowdown = 1.6%
+
+	fig 5 interesting:
+		- lose continuity over time
+		- recovers, then runs fftw, which consumes, then releases
+		  recovers, consumes releases (each spike gets higher)
+
+		- ignores inactive pages: could get *more* continuity
+		  by moving them, but only do so on request, so passively
+		  seem like less contig there.
+
+	why doesn't recover all if its available?  [does not relocate.
+	so may have enough in aggregate, but allocated pages sitting
+	in middle.  need turnover in these.]
+
+		can only recover 20 out of 60 requests.   weird:
+		only gets 35, out of 60 but this gives = best case
+		speed up?
+
+    6.6. worst case:
+	1. cost of promotion: allocate memory, touch one byte per page
+	   dealloc (overhead is all promotion in sequential pattern
+	   with no reuse).  overhead is 8.9%
+
+		why 3 incremental promotions?
+			8K->64K, 64K->512K, 512K->4MB.
+		they say allocate "some memory" so must be > 4MB.
+
+	   if you memcmp, then overhead is .1%
+
+	2. preemption overhead: preempt all the time, 1.1%.  not clear
+	   about this
+
+		given: 4MB contig.  
+		1. reserve 1 page 4MB.
+		2. reserve another +4MB.  will break 4MB into 8 512K
+		   regions.  the first has a reservation.  the latter
+		   will have another.  
+		3. do six more allocations.
+		4. all 512 reserved.
+		will become 64 64K regions.
+
+	3. overhead in practice?  very nice experiment: do all benchmarks,
+	   but don't actually do the promotion (still have to do
+	   allocation defrag etc)
+
+	4. big benefit from dirty demotion.

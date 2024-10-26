@@ -1,0 +1,11 @@
+
+4-pointer.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <bar>:
+   0:	e12fff1e 	bx	lr
+
+00000004 <foo>:
+   4:	e12fff1e 	bx	lr

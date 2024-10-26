@@ -1,0 +1,396 @@
+********************************************************************
+********************************************************************
+********************************************************************
+********************************************************************
+*
+*
+*  Worse is better notes
+*
+*
+*
+
+1. How does Gabrial rank correctnes, consistency, completenes, and correctness
+   for the two approaches?
+
+   the 100% solution versus the 90% solution (where does elegance fit in?)
+   (which would you prefer as consumer?  as producer?  why might production
+   favor producer?)
+
+    the right thing:
+	    correctness & consistency
+			|
+		completeness
+			|
+		simple interface
+	 		|
+		simple implementation
+
+	inferred:
+		- must be correct
+		- must be consistent, can be less simple and less complete 
+		  to avoid inconsistency)
+		- simplicity not allowed to overely reduce completeness	
+		- more important for interface to be simple versus
+		  implementatation
+
+
+     worse is better:
+	worse is better: almost exclusively concerned with implementation
+	simplicity, and will work on correctness, consistency and
+	completeness only enough to get the job done.
+
+	     implementation simplicity
+		   |
+	     interface simplicity
+		  |
+		correct
+		  | 
+		consistency
+		  |
+		completeness
+		  |
+	     consisteny of interface
+
+	slightly better to be sipmle than corect
+	must not be overly inconsistent: can drop parts that introduce
+		either complexity or inconsistency
+	completeness can be sacriieced for any other quality (however,
+	contradict?  consistency can be sacrificed to achieve completeness
+	-- hacks)
+
+	good enough.
+
+     key feature: many cases something is better than nothing.  so having
+     a sort of right solution is much much better than the years of
+     having nothing waiting for the right thing.
+
+     another: networking effect.  if there is a non-trivial adoption
+     cost, then the more people that use it the more incentive for
+     other people to use it.  language, OSes, chips.  so you want to 
+     be the defacto standard if possible and then improve. 
+
+    ------------------------------------------------------------
+    msoft model?
+	- backwards compatibility (not simple, not correct, not consistent)
+	- features (completeness)
+    why is complexity good?
+
+    why might releasing a few not-perfect systems before the perfect
+     	one be better?  quick, charge each time, adapt to feedback.
+
+    ------------------------------------------------------------
+
+   handle all corner cases vs handle the common case.
+	reduces which costs?
+		- risk (simple thing out quick, modifications in direct
+			response to feedback)
+		- time (out quick)
+		- cost (simple thing)
+
+   counter example sort of: the alpha chip.  very much a 90% solution.
+   but also a right thing approach to simplicity: because it was so
+   simple could make blazingly fast.
+	
+
+what is the most important thing for worse-is-better?
+
+2. Why is pc-lusering such a bad example?
+
+	1. it isn't right.
+	2. even if it is right, what is the trivial fix?
+
+
+3.  why sacrifice correctness?  (follow up: what does correctness
+    cost with current design practices?  (time))
+
+    why sacrifice implementation simplicity?  (why is it in intels
+    and msofts interest to design incredibly complex interfaces
+    and implementations?)
+
+	is there any piece of code you've used that is correct?
+	(almost certainly not)
+
+--------------------------------------------------------------
+
+1. As Gabriel states it, what are the features of worse is better vs
+the right thing?
+
+	the right thing: simplicity & correctness & consistency & completeness
+	are more or less equal.
+	
+	worse is better: almost exclusively concerned with implementation
+	simplicity, and will work on correctness, consistency and
+	completeness only enough to get the job done.
+
+2. What are some famous principles that contain/are contained in "worse is
+   better?"
+
+	Do-it-all-at-once (right thing) vs piecemeal growth from something
+	simple that grows in response to needs.  Lots of examples of
+	large systems in the latter:
+		- Internet
+		- web
+		- phone network
+		- gov't
+		- evolution  (some of you are the right thing, most are
+			new jersey)
+
+		[anything big that grew all or nothing?]
+
+		nice feature: feedback rather than having to understand
+		a priori.
+
+	     Successful, complex system: will be around for a long time.
+
+        	Problem 1: have to live with mistakes.
+        	Problem 2: correct choices will become mistakes.
+
+		Technology tradeoffs change dramatically, putting lots
+		of pressure to modify - unfortunately, if successful,
+		change is difficult because of installed base.
+
+	kiss: "do it right vs do it simple".  One example: dynamic
+	allocation vs fixed sized.  The right thing would be tailoring
+	everything to the right size.  This has lots of costs, so
+	in many cases you use a fixed size (or set of fixed sizes)
+	(machine instructions, money, [s,m,l] vs tailoring] )
+
+	"get something out the door quickly"
+
+	Note: right thing vs worse is better is a continuum rather than
+	black/white.  For example, if it crashes twice a week, but halves
+	the code size, should you do it?  
+------------------------------------------------------------------------
+He says this is a characature: 
+        What are the schemes that these distort?
+
+        1. worse: concerned with finite resources and getting useful
+        out the door.  Incompleteness to get a working system.
+
+        2. better: assumes sufficient resources; want a complete system.
+        wants good algorithm from the literature.   Completeness.
+
+        Pragmatics vs perfectionist?
+------------------------------------------------------------------------
+
+1. give example of worse things and better things?
+
+     do these really fit with Gabriel's thing?  what other things are going
+     on?  what kind of different slants can we give it?
+
+	happens with spoken languages --- English defacto standard,
+	other more elegant languages non-starters.
+
+2. why is worse is better better?
+
+	acceptance to the widest possible market and then improve.
+	non-trivial adoption cost, then go (e.g., don't really see this
+	with music (you buy vanilla ice and then stop), but do with
+	things like languages, etc)
+
+	lets say the right thing is X, and you can get there either by
+	doing the right thing or by doing worse is better.  which way
+	would you expect to make potentially (significantly) more money?
+
+3. is there a better characterization than worse is better?  
+	Microsoft seems to show that you can take worse even further.
+	correctness and simplicity not necessary at all.  in fact many
+	successful things show that simplicity is not really all that
+	important: Perl, c++, x86, ...
+
+4. advantages of incremental versus all or nothing?
+
+	- old stuff still works.  MIPS vs x86  (simple versus complex
+	  and horrible, but non-trivial switching cost)
+
+	- iteration: get something out fast, find out what is wrong with
+	it, and do something.  feedback is key.  often, don't know how
+	to solve the problem until you've solved it.  here you can get
+	something out the door, get people using it (hard to switch)
+	then adapt to what they want.
+
+5.  What important variables does Gabriel ignore?  
+
+	Cost is one big one, both in terms of how much you charge to sell,
+	and how much costs to build.
+
+	For example, lets say you have $50 bucks to make a new operating
+	system, how should we weigh simplicity, correctness, etc?
+
+	time is another.
+
+	risk.
+
+	Will a free system have better survival/promulgation features
+	than proprietary?
+
+6. Is Gabriel right?  is worse better?
+
+	after ten years, he doesn't actually know: wrote a series
+	of papers:
+
+	worse is better (pro)
+	"worse is better is worse" (con)
+	"is worse really better?"  (pro)
+	models of software acceptance (pro)
+	"is worse (still) better?" (con) (position paper)
+	"worse (still) is better!" (month later, pro)
+	still can't decide.
+
+
+----------------------------------------------------------------------
+is a continuum (a relative term) rather than absolute
+	worse		better
+	linux		bsd
+	windows		linux (well, sort of)
+	unix		multics --- but unix is much more elegant.
+
+argument is dated: we have windows (worst is best) vs unix (arguably
+the right thing)
+	
+in my mind, the most useful thing about this is to make pragmatic, 
+expedient choices: cut corners initially, get something out, do 
+the parts that matter righ.
+
+---------------------------------------------------------
+the intersection effect: large set of poeple, have to appeal, number of
+things is quite small.
+
+music, tv, books.
+
+japanese cars: initially cheap, badly made, wimpy.  but took over from
+more fancy "right thing" ones (compared to BMW, porche, say)
+
+implementation simplicity not the worse-is-better --- use it to 
+give yourself a lead time; works well for industry standard setters.
+
+
+	c++, 		modula3, eiffel, smalltalk, CLOS
+	
+	  [java seems reasonable]
+
+       --------------------------------------------------------------------
+key things:
+        1. this class is mainly about discussion.  if i have to listen
+        to some guy talk for 50 minutes, i start zoning out after 10
+        and then start skipping classes.  can't really learn either,
+        just passive.  going to try to make it much more interactive,
+        which is a lot of work for us.
+
+        2. going to be an experiment to turn a large class into discussion,
+        so we're going to have to be experimenting with what works and what
+        does not.  the class will roughtly be 60% from tests: you take 3
+        and pick the highest two.  40% will be everything else, which will
+        include class participation, pop quizes and possibly pop presentations.
+
+        sitn students don't have to worry, it's harder to participate so we'll
+        just have you write
+
+        so: everyday what should you do?  read the paper for the next class
+        at least twice closely.  make notes on its structure, what the main
+        points are, try to think of examples, counter examples, whether you
+        believe it, what is cool, what is broken.
+
+       --------------------------------------------------------------------
+        (In general, things that really succeed seem to be ugly.  perl,
+        tcl, c++, msoft products.  vs python/ruby/scheme.)
+
+        networking affect: non-trivial fixed cost to getting in, want
+        to be able to talk to other people.
+
+     * So can we come up with a better example of Worse is Better?
+       (1. The Y2K leap year problem may be suitable. To recap, you are
+       supposed to have a leap year when the year number is divisible by
+       4, but skip those years that are divisible by 100, but don't skip
+       the leap year if it is divisible by 400. Thus 2000 *is* a leap
+       year.
+       The "worse is better" school says that we just calculate the year
+       mod 4, and if the result is zero we have a leap year. This
+       calculation gives the right answer from the dawn of computing
+       through 2099 and after four years of field experience the
+       implementation is unlikely to have any bugs in it.
+       The "do it right" school says that we do a bunch of extra
+       arithmetic to check for divisible by 100 and divisible by 400,
+       with various conditionals to decide which case we are presented
+       with. Some of this code will be exercised for the first time ever
+       at the end of this month, at which time some, but not necessarily
+       all, of the remaining coding bugs will emerge. So "worse is
+       better" seems to have an identifiable advantage, at least for a
+       century or so.)
+
+The argument is an evolutionary one: viruses that spread quickly and are
+pervasive.  if successful they will be improved.
+
+good drives out excellent, the most popular is the least good
+
+
+---------------------------------------------------------
+
+[according to gabriel]
+
+characteristics:
+	1. impl should be fast.
+	2. should be small.
+	3. should interoperate with the programs people use
+	4. should be bug free, and if that means fewer features so be it.
+	5. use few abstractions. (abstraction = page faults)
+
+   implication: far better to have an underfeatured product that is
+   rock solid, fast and small than one that covers what an expert would
+   consider complete requirements.  [so what is microsofts model?]
+
+benefits
+	- less development time: out early, adopted as defacto standard
+	- can run on smallest computers; probably easy to port.
+	- pressure to improve over time will acquire the right feature --
+	thos the customers/users want rather than those the develops
+	thik they should have.
+
+   path of acceptance: act like a virus, providing functionality with
+	minimal acceptance cost.  can be improved and is small and
+	simple enough to do so (nice point: small simiple = much much
+	easier to modify in response to feedback.)
+
+	small simple = quick to build, cheap to build, easy to incorporate
+	feedback, customization (feature of early unix)
+
+the acceptance model for the right thing is that it comes late to 
+market but is so wonderful it is accepted.  has to run on every
+platform right away or quickly.  can happen; unlikely.
+
+right thing based on the philosphy of letting the experts do their
+expert thing all the way til the end until the users get their
+hands on it [key point about feedback]
+
+incremental releasess: can charge for each, will be a smaller steop,
+with less investment, less time, more feedback: more of the "right
+thing" from the users point of view (perhaps --- can always correct
+if not)
+
+key idea: identify the true value of what you bring to market,
+test ideas in small context, imporve in participatory way, and
+them package in the elast risky way
+
+---------------------------------------------------------------------
+
+most popular thing = mediocre.  might not be anymore more deep.
+
+
+in some sense, successful will get ugly: will have many demands, 
+will likely adapt to them (success), get more random entrpy.
+
+why earliest adopted so good?  1Billion people speak english, 10
+speak esperanto.  which would you probably learn?
+
+key: something is better than nothing.
+
+---------------------------------------------------------------------
+when counter examples?
+	qsort: simple, clean, elegant.  much of mathematics is like that.
+	elegant at least, if complex.  engineering has costs.
+	
+	accessible.  this is the main thing?  if it's out there its
+	accessible.  if it's ported to many places.  if ubiquitous.
+
+	the more accessbile, the more potential consumer base, and the
+	stronger the final networking effect.

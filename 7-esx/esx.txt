@@ -1,0 +1,521 @@
+**********************************************************************
+**********************************************************************
+**********************************************************************
+**********************************************************************
+*
+* ESX Notes.
+*
+*
+*
+*
+
+non techniqcal:
+	- carl has won 2 out of the 5 best papers at OSDI.
+	- libertarian that decided to not go academics since he didn't want
+	  to take government money.
+
+	- real system.
+	- commercial.  good commercial papers are rare (vms has been 
+	  the only other one so far).
+
+
+acording to mendel two main things esx used for a lot.:
+	1. run N app on NT/windows = crash.  run one app on NT /windows
+	   = no crash.
+
+	   Note: nice way to trade memory+cpu cycles for reliability.
+
+	2. security isolation: hard to break into vmware.  only compromise
+	   guest os.
+
+	how to run OS as an application on top?  
+		1. have to intercept all input from the environment.
+		2. intercept all places where it interacts directly
+		   with env, or save/restore environment on switch
+		   (e.g., registers)
+
+
+
+	3. paper's main argument: statistical multiplexing.  machine
+	mostly idle.  rathr than have deadicated one, throw a bunch of
+	the same machine and just buy a faster one (or save the money).
+	if not mostly idle then this does not work that well.  though:
+	in the case of memory, could make an argument that aggregation
+	helps a lot.
+
+four main tricks:
+        1. how to get pages from the OS.
+        2. how to share pages across OSes.
+        3. how to integrate proportional share with some system feedback.
+        4. i/o pages.
+
+-------------------------------------------------------------------------
+abstractly what is virtualization?
+        - insert a translation point between all uses of physical
+          hardware and map them to logical uses
+
+        - typically used to go from a small, fixed number of physical
+          resources to a near infinite number that as we exceed just
+          gets smaler.
+
+        - virtualization = translation.  intercept + remap to what we want.
+                for speed, in reality: get a trap on all important events
+                        - use of privileged instruction
+                        - kernel address
+			...
+
+        can always just interpret the whole thing and force it to
+        do whatever we want.
+                when they say non-virtualizable, really means what
+                features prevent us from running it directly and just
+                catching when it does something bad with a trap.
+
+
+   if i think i have X, do i?
+	- register r1?  yes.
+	- r/w tlb?    sort of gets relabeled.
+	- PPN?  no.
+
+   what isn't virtualized?
+        registers: save and restore
+        tlb: flush
+-------------------------------------------------------------------------
+  what does memory virtualization mean?  just one more layer of indirection
+	VA -> PPN -> MPN.
+   
+    we've already done this.  random association.  need a table.  PT for
+    VPN->MPN.  what for other?  [pmap]
+
+    easier for PNN -> MPN than for VA->PPN?
+	dense, small, just use an array.
+
+    how to insert this layer?
+   	- every tlb insertion have to relabel.
+
+	- every address they give to dma device have to redo.  and if
+	  the page is too high, have to copy it.
+
+	- if they read the tlb have to intercept.
+
+	- if they can write to raw physical memory have to intercept
+	  loads and stores (e.g., on the mips)
+
+	- when you switch between OSes, may have to pin additional tlb
+	  mappings
+
+	- NASTY: if they relie on conflict misses to synchronize the
+	  cache you may be in big trouble.  easily.
+	  
+    what can't we hide?
+	time.
+
+    overhead:
+	32MB per VM, 4-8MB used for framebuffer.
+-------------------------------------------------------------------------
+page replacement: 
+	Perfect practical = LRU.  Perfect worse with ESX = LRU.
+
+
+	if we take our own LRU page what is the problem?
+		if we are roughly synchronized with guest os and both
+		make similar decisions, could both decide to page out
+		the same page.
+
+	if we had good knowlege: best thing would be to take somethin
+	off the guest freelist.
+
+	how to find the guest freelist?  call getpage() (or equivalent)! 
+
+	another possibility would be to give the guest OS a huge amound of
+	physical memory, so that it is doing eviction paging relatively
+	less often.  what is wrong with that?  (one thing is that most
+	of its evicted pages will in fact be paged out over time so your
+	guaranteed that they won't be in memory)   also we will blow
+	a lot of overhead in the guest data structures.
+	
+	one change in view: 
+		naive: only emulate machine to trick OS.  not allowed
+		to do anything else.
+
+		refined:  view OS as a black box.  can use any well
+		defined interface (syscall, driver interface, machine).
+
+ figure 2:
+	black bars: configure OS with exactly that memory.
+	grey: configure with 256MB, balloon down to the size.
+
+	1. why does throughput go up with size?
+		[large working set: can use more cache]
+	2. why is grey bar smaller than black?
+		[ overhead of having more mem]
+	3. why overhead larger with small?
+		[ same configure, balloon down more = more overhead]
+
+-------------------------------------------------------------------------
+sharing memory
+
+running multiple copies of same OS: want to coalesce duplicate pages.
+
+how do i decide to share?
+	-scan or at page out.
+	- hash page.
+	- look up in hash table.
+	- compare equal.
+	- if already entry:
+		- if shared? just increment refcnt.
+		- if not shared before?  
+			mark COW.   [what does this mean?]
+			change entry, refcnt=2
+		- if not equal but hash same: do nothing.
+
+	- if not there
+		insert.  what else?  
+
+
+table indexed by hash of each page.  maps to either
+	hint frame:
+		hash, PPN, MPN, the VM that has it (so you can go change
+		page table)
+
+		generated by a demon that hashes.  mark the page as 
+		COW after hash?  no.  first write would screw it up.
+
+		do a random scan; also always attempt to share page
+		before pushing it out to disk.
+
+		this is why hint: not actually true.  may be false.
+
+		use PPN:VM to go find and modify the page table to change
+		to read permissions for COW.
+
+	shared frame:
+		hash, MPN, refs.
+
+		mark page as COW.  big overhead?  allocate zero filled,
+		then write to them.
+
+	how to demote?  doesn't seem to.
+
+nice about random?  will bias towards long lived pages!  spagetti paradox:
+pull spagetti out of pot, will get longer strands.
+
+two experiments, just like superpage: "[sort of] best case" and 
+"typical case"
+	missing: experiment that measures real amount of memory free
+
+Figure 4:
+	run 1-10 linux OSes with 40MB spec95 benchmarks for 30 mintues.
+	same thing, but probably not that well syncronized, and small
+	buffer cache means won't keep around.
+
+	[ why granularity different?  30 minutes rather than sec? i think
+	because its for servers so just care about asymptotic.  do care
+	if it can handle bursts though]
+
+	different between shared and reclaimed?
+
+		- the memory actually taken back.  if two people share
+		  a page, shared = 2, reclaimed = 1.  if 10 people share,
+		  shared = 10, reclaimed = 9.
+
+		  so the degree of difference inverse proportional to
+		  sharing: more people sharing same page, then goes to
+		  diff of 0%.  
+
+		 - gap at the beginning means that less people share than
+		  later on?  why is that?  of course: less vms.  then
+	    	  get more asympotic.
+
+		 - small at beginning then spike because 55% of sharing
+		   with 1 vmm is the zero page, which will have many
+		   many references.
+
+		- will get 1 for each shared page, so is essentially a
+		   count of the number of shared pages.  would be better
+		   to have a line "ave ref count" and "number of pages
+	 	   shared"
+
+	- why doesn't shared line start at origin?  why sharp initial spike?
+	  why tail off quickly?
+
+	- why does it only go up to 67% shared rather than 100%? 
+
+	- say they reran w/o sharing and didn't perform worse.  can they
+	  draw this conclusion [if there is no paging, reasonable.] how
+	  big is machine?  is there paging?
+
+Figure 5: "typical"
+	- why less sharing as you go down?
+		[could be that linux is tight with less dup [most dup 
+	  	 in os itself] could also be that it sucks at zero 
+	    	 page management: 25MB of 120MB saved for linux, 
+		 70MB of 345MB for windows]]  
+
+	- can view zero page as an annotation that don't need.
+
+	- about 1/5 due to zero pages for last two.
+
+	32MB each VMM, 512 -> 360 available, so 320 + 120 = 440 used for
+	virtualization, which isn't an impressive win.	(only better
+	for A)
+
+---------------------------------------------------------------
+shares versus working sets.
+
+want to partition for similar reasons to vms, but not get penalized
+by idle parts (as much).  
+
+need to incorporate feedback from the system.  e.g., vms just had the
+resident set limit, but didn't have any way to adjust even if the 
+other guys were not using.
+
+want to know how much of memory is idle.
+	samples 100 pages every 30 seconds -- what happesn if this
+	sampling period goes to zero?  [actually don't want fine grained
+	measurements!  cpu bound app, or blocked on i/o]
+
+		use 33 pages after 30 seconds: claims 67% of memory idle.
+
+have p1 and p2, need memory: how?
+	min(s1/p1, s2/p2): many shares, few pages -> more likely to keep.
+
+fuse feedback with proportionality:
+	
+	p = 		S
+	 	----------------
+		P (f + k (1 - f))
+
+        k = 1 / (1 - r),   1 <= 1 < inf
+	r = taxation rate, 0 <= r < 1
+
+     f = amount of active memory.  put a tax on idle memory (1-f).
+     75% tax means that will take back at most 75% of idle mem.
+
+   how to get VMS?  need (f + k (1 - f)) = 1.
+      r = 0 implies k = 1
+	  (f + k (1 - f)) =  (f + 1 (1 - f)) = 1.
+   or f = 1
+	  (f + k (1 - f)) =  (1 + k * 0) = 1.
+
+   if taxation is 100?  k = inf
+	  P (f + inf (1 - f)) = inf
+   but it's relative, so washes out?  really weighs any f < 100 very
+   strongly.
+
+   if f = 0, then scales in direct proprotion. 
+	 	P * k
+   what does curve look like as a function of usage?
+
+   [*]draw (f + k ( 1 - f)) for a bunch of ks.
+
+	[magnitude of it?  
+		0 <= f <= 1
+		1 <= k < inf
+
+		f = 0 means
+			f + k (1 - f) => 0 + k - 0 so directly tracks k.
+
+		f = 1 means tracks f.  
+			min(f.min, k.min) <= .  <= max(f.max, k.max)
+
+			0 <= ... < inf]
+
+
+three averages:
+	1. slow moving
+	2. fast moving adapts to working sets quickly
+	3. super fast
+  esx uses maximum to estimate amount of memory used.  implications
+	1. won't take away that quickly.
+	2. will give credit quickly.
+
+figure 6:
+	why do estimates trail?
+	   on up:
+		how slow does it trail?  (looks like a couple of minutes)
+		max works pretty well, tracks it very closely.
+          
+	   on down:
+		both trail by about 1.5 minutes.
+
+	- why above?
+	does it work?
+
+figure 7: 
+	- huge overhead: out of 512MB, only 360MB is available for users!
+
+   if we have a .75 tax rate, and 0% use of memory, what is the fraction
+   we get?
+		S / P * (0 + 1/.25) = S/4P
+	S1 = S2, P1 = P2, then 1/4
+
+	... and 100% use of memory?
+
+		S / P * (1 + 4 * 0) = S/P.
+
+
+		increases amount of memory used by 4x.	could have
+		allocated 4x more memory and used 100% of the time for
+		the same share.
+
+	why doesn't the line go up to 
+		180 + 180 * .75 = 315?
+
+	[max configured: 256.  min is probably 100, though doesn't say]
+
+	we really can't figure out how well it works.  you'd need to 
+	configure max to be 320 at least.
+
+	why does VM2's line go up at first?  booting, so pretty busy
+	zeroing pages (windows)  drops after.
+---------------------------------------------------------------------
+allocation policies.
+
+how much memory a guest gets is determined by:
+	min: guaranteed, never take.
+	max :  configured linux to think it has that much.
+	shares: relative proportion of memory you can use.  2x = 2x more mem
+
+	- max = min, then shares don't matter.
+	- if not overcommitted then you get max.
+	- if sum of min + overhead = the amount of physical memory,
+		then do not let other VMMs run.
+	- how much aggregate disk space?
+		sum of (max - min)
+	- will never page you below min.  ever. does this cause problems?
+	
+when does page deamon kick in?
+	
+			do nothing
+	high (6%) -->	----
+			start using balooning (paging if no baloon driver)
+	soft (4%) -->	----
+			paging
+	hard (2%) -->	----
+			paging + block vms that > min.
+	low  (1%) -->	----
+
+tries to always be above high.  the system transitions to a higher state
+only after significantly exceeding its threshold.  funny that it is so
+close to the wall.  disk latencies are so slow...
+
+figure 8:
+	1. windows exchange benchmark (2 vms, min=160MB,max=256MB mem)
+		a. exchange server, windows 2000 server.
+		b. load generator (to a), windows 2000 professional
+		
+
+	2. citrix metaframebenchmark (2 vms, min=160MB,max=320MB mem)
+		a. metaframe server, windows 2000 advanced server.
+		b. client load generator, windows 2000 server
+
+	3. sql server (1 vm, min=160MB,max=320MB mem), windows 200 server.
+
+	Sum = 1.4GB, machine has 1GB
+	- share before swap: 
+		- 325MB of zero pages not sent to disk.
+		- 35MB of non-zero written to disk.
+
+        - why initial dip?  [zeroing]  page 32MB out of 325MB actually hit
+                        disk because of share before swap.
+
+
+
+        (d) idle so gos down to 160MB (min) or so.  query kicks in, then
+            jumps back up.  (at the same time, balloon goes down since
+            memory is not idle)
+
+
+	- what determines the size of the spike up? 320MB is hte max (check)
+
+(b)
+
+
+	- why does sharing go down?  (run different apps.  at the beginning
+	  lots of zeros, and shared code)
+
+	- as active shoots down, why does alloc not go much below?
+		[configured with 1GB: always try to get that much in 
+	 	  use]
+
+	- between 20-30 why does it go down much more than 1GB?
+		[overshoots when transition to hard]
+
+	- why does it go above 1GB?  might be accounting?  or includes
+	  vmware mem too?  i think it counts shared memory = S*refs.
+		[aggregate allocation = 1.2GB]
+
+	- why does it mirror the ballooning line?
+		[taken back with ballooning, mirrors active too]
+
+	- why does ballooning mirror the active line?  [different apps.
+	 	one goes up, the other app gets ballooned]
+
+	- how much shared? (about 20%)
+
+	- two inital peaks, one pushes to the low state, one pushes to the
+	  hard state: why?  [i think is partly because (1) booting so cannot
+	  use ballooning and (2) first peak is a rapid increase from almost
+	  nothing, the second is a relatively small delta + already over
+	  shot goal]
+
+  (c) 
+	- active tracks alloc morphology really well, as ballooning does
+	  inverse
+
+	- shared rises over time, any ideas why?
+  
+    the fact that balloon mirrors alloc must mean that the guest os
+    is pushing, trying to consume more memory.
+
+    interesting: seems like taxation kicked in, since active in citrix
+    causes balloon to go down, and alloc to go up in a very similar
+    fingerprint pattern.
+--------------------------------------------------------------------
+how different than vms?
+	- get OS on top to do some of the work (ballooning)
+	- fluctuates the RSL
+	- how different than LRU?
+
+--------------------------------------------------------------------
+- how many references per page on average?
+	67% of memory shared.
+	60% of all memory is reclaimed.
+	1 page for each shared group.
+
+    assume 100 pages.
+		67 pages shared
+		60 reclaimed.
+		 7 pages left, so 7 distince groups.
+
+	reclaim = (unique pages * (references - 1))
+
+	reclaim 
+        ------	 + 1	= refs
+        unique
+
+	reclaim 
+        ------		   + 1 = refs
+        shared - reclaim
+
+	60          + 1
+        -- 		       =
+        7
+
+	9.57 		= refs.
+
+	makes sense: have 10 OSes.
+
+  why not exactly 10? (probably some inter sharing, plus any stuff
+   that gets not synchronized)
+
+  refs for other boxes tables
+	 A = 673/(880-673) + 1 = 4.25
+	 B = 345 / (539-345) + 1 = 2.77
+	 C = 120 / (165-120.0) = 2.67
+
+isolation and performance are conflicting goals.  fundamentally
+the only thing you can do is decide how much to weigh one or the
+other.  that is it.  his taxation does this simply in a smooth
+function without weird discontinuities.
+--------------------------------------------------------------------

@@ -1,0 +1,25 @@
+
+1-timer-fix.real.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <mul_mul>:
+   0:	e59f3014 	ldr	r3, [pc, #20]	; 1c <mul_mul+0x1c>
+   4:	e593c004 	ldr	ip, [r3, #4]
+   8:	e0010192 	mul	r1, r2, r1
+   c:	e5801000 	str	r1, [r0]
+  10:	e5930004 	ldr	r0, [r3, #4]
+  14:	e040000c 	sub	r0, r0, ip
+  18:	e12fff1e 	bx	lr
+  1c:	20003000 	.word	0x20003000
+
+00000020 <null_cost>:
+  20:	e59f3014 	ldr	r3, [pc, #20]	; 3c <null_cost+0x1c>
+  24:	e5932004 	ldr	r2, [r3, #4]
+  28:	e3a01000 	mov	r1, #0
+  2c:	e5801000 	str	r1, [r0]
+  30:	e5930004 	ldr	r0, [r3, #4]
+  34:	e0400002 	sub	r0, r0, r2
+  38:	e12fff1e 	bx	lr
+  3c:	20003000 	.word	0x20003000

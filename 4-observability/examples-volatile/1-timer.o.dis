@@ -1,0 +1,22 @@
+
+1-timer.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <mul>:
+   0:	e0010192 	mul	r1, r2, r1
+   4:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+   8:	e59fc028 	ldr	ip, [pc, #40]	; 38 <mul+0x38>
+   c:	e24dd00c 	sub	sp, sp, #12
+  10:	e59ce004 	ldr	lr, [ip, #4]
+  14:	e58d1004 	str	r1, [sp, #4]
+  18:	e59c3004 	ldr	r3, [ip, #4]
+  1c:	e59d2004 	ldr	r2, [sp, #4]
+  20:	e043300e 	sub	r3, r3, lr
+  24:	e5803000 	str	r3, [r0]
+  28:	e1a00002 	mov	r0, r2
+  2c:	e28dd00c 	add	sp, sp, #12
+  30:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+  34:	e12fff1e 	bx	lr
+  38:	20003000 	.word	0x20003000

@@ -1,0 +1,23 @@
+
+2-wait.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <write_mailbox>:
+   0:	e59f2028 	ldr	r2, [pc, #40]	; 30 <write_mailbox+0x30>
+   4:	e5923098 	ldr	r3, [r2, #152]	; 0x98
+   8:	e3530000 	cmp	r3, #0
+   c:	aa000002 	bge	1c <write_mailbox+0x1c>
+  10:	e5923098 	ldr	r3, [r2, #152]	; 0x98
+  14:	e3530000 	cmp	r3, #0
+  18:	bafffffc 	blt	10 <write_mailbox+0x10>
+  1c:	e59f300c 	ldr	r3, [pc, #12]	; 30 <write_mailbox+0x30>
+  20:	e1800001 	orr	r0, r0, r1
+  24:	e3800101 	orr	r0, r0, #1073741824	; 0x40000000
+  28:	e58300a0 	str	r0, [r3, #160]	; 0xa0
+  2c:	e12fff1e 	bx	lr
+  30:	2000b800 	.word	0x2000b800
+
+00000034 <inf>:
+  34:	eafffffe 	b	34 <inf>

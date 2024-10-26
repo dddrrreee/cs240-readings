@@ -1,0 +1,492 @@
+***********************************************************************
+***********************************************************************
+***********************************************************************
+*  Livelock notes 
+*
+*
+*
+*
+*
+*
+*
+*
+*
+
+----------------------------------------------------------------------------
+how to tell if system livelocked?
+	- no output
+	- packets dropped in queue
+	- different things not running.
+    infinite packets only help (2) which in some sense is irrelevent.  
+    leads to:
+	- massive latencies induced.
+	- massive variability.
+
+principles:
+	0. look at all schedulable entities and make sure they
+	   cannot starve.
+
+	1. for fairness: need time slice + RR (w/ priorities)
+		can measure time slice in multiple ways.  count packets.
+		measure.
+
+	    need to service all things: keep track of how much for net
+	     processing.  drop when exceeded.
+
+	2. for speed: when idle, use interrupts to notify.  when know 
+	   work is there, use polling.
+
+	3. discard before doing work.
+		can look at packet as work you've invested.
+		discard late = waste = friction.
+
+	4. if busy don't accept new work.
+		busy = downsteam queue is full.
+		when have a lot of work demote priority of input ---
+		run at interrupt level (same priority), shut off
+		interrupts (priority = 0) and run.
+
+
+solution:
+  discard early (how?)
+  don't starve jobs (how?)
+  turn off interrpts to control work, and batch for speed.
+  eliminate queues (partial solution: need queues at some point
+   between app or between xmit)
+
+  why not just run receive interupt at lowest level?  (lose packets.
+  do want to pull off an queue up in bursts.)
+
+   ---------------------------------------------------------------------
+KEY
+  more detailed:
+
+    1. when we know there is stuff to do, turn off interrupts.  
+	- control work generation.
+	- faster: poll when you want to decide what to do.
+	- turn on when no more stuff to do (don't want to check when
+	  nothing is there)
+
+	- polling much faster when something is there; waste when not.
+
+	note: non-preemptive scheduling, have to voluntarily interleave.
+
+ 	when exactly do you turn back on?
+
+   2. get work by pulling from end, rather than pushing to it.  if you
+      hit any queue, can get livelock.  and you will fundamentally have
+      to hit a queue since it has to go to some application.
+
+   3. drop packet early.
+	when you get a packet off, shove to the end.
+	when end fills up, shut off input.
+
+   3. round robin/proportional share rather than starve any piece.
+	- make sure app runs enough, make sure transmit runs enough.
+	- have to come up with a time-slice or proportion to give.
+
+	* however * we do intentionally starve receive.  why?
+
+one way to look at it is that we go from a push architecture where the
+system injects work into us, to a pull architecture where we pull packets
+off.
+
+broken?
+	- don't do flow differentiation.  so everyone suffers when anyone
+	  is getting overloaded.
+
+        IN GENERAL: have to make sure we service schedulable entities.  We
+        get fairness by round robin between all schedulable
+          entities.  RR between:
+                1. p1, p2, p3
+                2. between sending and receiving,
+                3. between network processing and application
+                4. between anythying that has a queue.
+
+--------------------------------------------------------------------
+KEY
+Note: two weird things.
+    1. Unlike all other scheduling we've talked about, here you starve
+    deliberately!  input processing deliberately starved when later
+    stages busy.
+
+    2. Packet discard is a fundamental design consideration.  No other
+    OS subsystem is like this: don't throw away packets, truncate files,
+    etc when "too busy".  (Actually, not true: Linux will kill processes
+    when too much memory in use)
+---------------------------------------------------------------------
+
+cool/key insights.
+        - non-flow control leads to livelock.  the interesting perspective
+          is that livelock in the machine is handled by backing off when
+          you drop packets in a queue.  this happens across machines as
+          well.
+
+        - the paper is essentially a scheduling problem: want to be fair
+          to all entities, and when you have to shed load, do it in such
+          a way that you waste as little effort as possible.
+
+          * if not network, would just round robin between everyone.  or
+	  as with swapping, turn some people off when you go below a
+	  minimum accepted threshold.
+
+        - interrupts make the environment into a scheduler.  need to shut
+          it up when the other scheduler becomes non-quiescent.
+
+        - when interrupt processing = too much, shut things down.
+                1. when about to drop packets
+                2. when starving other jobs
+
+          can push through at high levels (have to make sure app doesn't
+          starve) or pull through on demand.
+
+if Q exceeded, have two choices: run the consumer, shut up the producer.
+--------------------------------------------------------------------
+
+
+"any purely interrupt-driven system using fixed interrupt priorities
+will suffer from receive livelock under input overload conditions."
+
+interrupt handler: highest priority that runs if there is work.  so if
+infinite work, always runs, and everyone starves.
+	two approaches:
+		1. stop work generation (equiv: shed load).
+		2. cycle between jobs (same thing)
+
+	what do they mean by fixed interrupt priorites?
+
+
+----------------------------------------------------------------
+KEY
+livelock:
+	1. some part of systems always scheduled when have work, 
+	   some part scheduled when you have nothing else to do.
+
+	   infinite work generation: part 2 starves.
+
+	2. work generated by external forces that are not really
+	   under your control.
+	
+fundamentally do two things.
+	1. starvation: bring under dominion of shared scheduler.  round robin so
+	   no starvation
+
+	   [is that enough?]
+
+	2. overhead: stop work generation when cannot handle more (e.g., when
+	   overhead increases)  
+
+           (in networking: discard early so don't waste.)  in paging: 
+	   swap proess out.
+
+	each unit of work consumes resources.  so have to shut it up.
+
+continuous view: as that you get busier, you waste more and more cycles
+on overhead.  swapping is a great example.  cannot throw processes away,
+so swap them out til system queises.  linux will actually discard a process
+(OOM killer)
+	percentage of useful work done.  with fairness included.  want it
+	to remain stable under high load.
+
+General rules:
+        1. drop packets as early as possible; if queue fills up, shut down
+           all prior processing.
+           
+        2. go to a pull architecture: shut down earlier steps and poll as
+           needed.
+                - don't waste time on packets that you will kill earlier.
+                - if not careful: can lose packets when you don't need to.
+----------------------------------------------------------------------------
+key questions: 
+	- when do i stop pushing a packet through and get the next one?
+		good question.
+	- when do i stop processing at a given stage and go to the next one?
+		time slice.
+
+   not a good answer: 
+	could go back populating all queues
+	but introduces big latencies.
+
+   at its core: they use RR with time slices to do this.
+	the hack with the application is different units: give some percentage.
+
+	- turning off interrupts is a way to turn off the other scheduler.
+	- want to use interrupts to kick start process, but then turn off
+	  and cede to main scheduler.
+
+   problem: no traffic sepeartion.  They shut down procedssing once application
+   queue fills up, hurting everyone.
+
+   eliminating queue means packet goes where?  
+	- to app queue
+	- to forwarding queue.
+-----------------------------------------------------------------------
+polling vs interrupts.
+
+this whole paper is about how different parts of the system can starve under
+high load, causing all packets to be lost.
+
+draw picture of:
+	1. network receive interfaces, queues, processing threads
+	(interrupt handler, high level, application, transmit with queues
+	at each boundary).
+		- queues are fixed size.  queues trade space for time: many
+		  scheduling points will run at different bursty rates.  so
+		  catch the packets and hold.
+
+		- drop when exceed.  (networking always has this failure mode.
+		  weird: VM, FS, locks do not do this.   why ok for networking?
+		  end to end argument that we will be talking about:
+		  packets can get dropped at various points in the
+		  network, ok for us to as well.  the other way to look at it
+	  	  is that if we make it perfect, never drop packets, does not
+		  matter, net will still do it.)
+
+		  typically dropped at queue on boundary between different
+		  priority levels (otherwise won't starve).
+
+		- interrupt runs interrupt handler, usually nonpremptively
+
+  KEY?
+		- scheduling must make sure the following don't starve:
+			reception
+			transmission
+			protocol processing
+			i/o processing
+			applications
+		  all schedulable entities must be done at some level.
+		  simple innocuous loops can kill this.
+			while(1) {
+				while eth1 has packets on receive Q
+					process
+				while eth2 has packets on receive Q
+					process
+				...
+				while eth1 has packets to send
+					process
+				while eth2 has packets to send
+					process
+			}
+		   multiple starvations in this loop:
+			- if eth1 really busy, eth2 will starve
+			- if receive busy, send will starve.
+			- if net busy app will starve
+		   how to solve? Give each activity a *time-slice*!  (They
+		   call it a quota, which is how many packets each stage can
+		   service) the tradeoffs here are the same as all RR 
+		   time-slice tradeoffs:
+			1. as slice goes to infinite RR becomes FIFO and  
+			   overhead % goes to 0.
+
+			2. as slices goes to 0, scheduling overhead increases.  
+			plus, the average completion time goes to 1/n.  
+
+                   you always batch up to decrease overhead.  These tradeoffs
+		   always happen whenever we quantize a resource.  E.g., with
+		   pages, as page goes to 0 overhead goes to infinity but
+		   internal frag goes to 0.  as pagesize goes to inf so does
+		   internal frag.
+
+		beautiful mogul insight: a scheduler is something that 
+		decides what to run.  OSes essentially have two schedulers!
+			1. normal scheduler determines when to run different
+			apps, etc.
+
+			2. environment (through interrupts) is the other
+			scheduler (i.e.,   interrupts also determine
+			when to run something).  Big problem is that
+			this scheduler is not integrated with normal
+			scheduling so ignores priorities, fairness, etc.
+			Especially important since interrupt scheduling
+			has higher priority than main scheduler.
+
+	"what happens if interrupt runs at higher level than process?"
+		receive livelock: push packet all the way to queue and
+		then have to discard.  (weird that they don't have some
+		sort of check up front if there is space at all.)
+
+		gives absolute priority to incoming packets (bsd)
+
+		batching increases the length of the interrupt handler:
+		keeps processing away.
+
+	"how can transmit starve?"
+		tranmit at lower priority level
+		at same priority level but receiver processed first,
+		if transmission finish detected by polling.
+
+	"why not have later stage have higher priority?"
+		will lose a lot of packets.  packet arrival is bursty.
+		you may have plenty of buffer space, which can absorb
+		the burst.
+
+	+ livelock = deep queue where packets are lost.  how can we get
+	    deep queues at these places?
+
+		- transmit queue full if receive interrupts come in
+		  and the transmit guy never gets to run 
+
+		  what about network packets causes this?  (1) high event
+		  rates and (2) no high-level backoff.	  TCP would not
+		  have this problem since it backs off in the face of
+		  packet loss and negotiates how much buffer space the
+		  destination node can provide; another protocol that
+		  kept sending lots of stuff would.
+
+		  interacts with scheduling: if purely interrupt driven,
+		  than what interrupt comes in determines what runs.
+		  this easily starves other system things.
+
+	what happens if this t_intr runs at a higher priority than t_protocol?
+
+		[ can keep receiving packets and put them up on t_protocol,
+		  will discard afterwards ]
+
+maximum loss free receive rate (MLFRR): the rate of incoming packets
+where thre will be no losses.  if you get more than this rate want the
+rate of delivered packets to stay here!  livelock causes it to go down.
+
+solution?
+	1. push all the way to application at high interrupt levels.
+	2. turn off interrupts and start polling.
+
+----------------------------------------------------------------------------
+[These notes are from Robert Morris]
+
+Eliminating Receive Livelock in an Interrupt-Driven Kernel,
+by Mogul and Ramakrishnan
+
+What is the problem?
+  For IP forwarding example.
+
+  (note every packet in gets forwarded out, so we'd like to see a line of slope
+   1 intersecting the origin.)
+
+Explain Figure 6-1.
+  Why does it go up?
+	[forwarding packets: 1-1 line that passes through the origin]
+  What determines how high the peak is?
+	[MLFRR: the rate that it can process beofre it loses stuff]
+  Why does it go down?
+	[starts losing stuff after doing wasted work --- this makes the
+	 system less efficient (friction in a sense)]
+
+  What determines how fast it goes down?
+	[how much work it wastes per time it does something useful]
+
+    (fraction of packets discarded)(work invested in discarded packets)
+       / (total work CPU is capable of)
+
+
+
+Suppose I wanted to test an NFS server for livelock.
+  Run client with this loop:
+    while(1){
+      send NFS READ RPC;
+      wait for response;
+    }
+  What would I see?
+  Is the NFS server probably subject to livelock?
+     No--offered load subject to feedback
+
+	If I run a billion of these?  (connection flowcontrolled, 
+	inter-connection not)
+
+How do they fix this problem?
+  No IP input queue.
+  Input processing and device input polling in kernel thread.
+  Device receive interrupt just wakes up thread.
+    And leaves interrupts *disabled* for that device.
+  Thread does all input processing,
+    then re-enables interrupts.
+
+  Then poll all interfaces round robin.
+
+  note: qouta = time slice.
+  - thread seems to run at higher priority than anything else.
+  - why not run all this stuff in the interrupt handler?  sleep, cannot
+    acquire locks, would block disk interrupts, clock inters, etc.
+  - smaller transient bursts will lose packets.
+
+Why does this work?
+  What happens when packets arrive too fast?
+	[interrupts get disabled, the code pulls it off and pushes it forward]
+  What happens when packets arrive slowly?
+	[interrupts enabled, nothing really different]
+
+  infinite buffer fix?
+	- no: latency huge, jitter huge, still have starvation.
+
+Explain Figure 6-3.
+  Why does "Polling (no quota)" work badly?
+
+  Why does it immediately fall to zero, rather than gradually decreasing?
+
+  Why is unmodified better?  
+	[ modified does more work per discarded packet since it does the
+	  protocol processing as well rather than just link level stuff]
+
+  if screend gets cswitched out, what happens?  re-enable.
+
+
+Explain Figure 6-4.  [can look at it as: add another queue and entity,
+	so can starve it as well]
+
+  Why does "Polling, no feedback" behave badly?
+    There's a queue in front of screend.
+    We can still give 100% to input thread, 0% to screend.
+  Why does "Polling w/ feedback" behave well?
+    Input thread yields when queue to screend fills.
+
+  What if screend hangs, what about other consumers of packets?
+    E.g., can you ssh to machine to fix screend?
+      Fortunately screend typically only application
+      Also, re-enable input after timeout
+
+	Problem with feedback?  Cannot generally stop the packets just
+	for one application.  Pull them off one at a time with a non-trivial
+	cost.  Comes from the fact that we have a undifferentiated first
+	in first out queue of packets.  If they were  split up, would be
+	pretty easy.
+
+Why are the two solutions different?
+  1. Polling thread *with quotas*.
+  2. Feedback from full queue.
+  (I believe they should have used #2 for both.)
+
+If we apply their fixes, does the phenomemon totally go away?
+  E.g. for web server, waits for disk, &c.
+
+What if processing has more complex structure?
+  Chain of processing stages with queues?
+    Does feedback work?
+    What happens when a late stage is slow?
+  Split at some point, multiple parallel paths?
+    No so great; one slow path blocks all paths.
+
+
+6-5:
+	why smaller quota better?  why not just make quota be 0?
+	from 6-6: when you have lower, they are slightly worse.  why?
+
+	"quota between 10 and 20 yields near optimal behavior" why?
+
+   25% should give 75% to app, but gives less.
+	1. no packets only get 94%
+	2. only check after processing 5 packets (costs 1ms)
+       cost of handling the actual interrupts?
+
+7-1:
+   what is motivation?  network can soak up everything.  cpu bound starves.
+
+   give a percentage to each (essentially a time slice): just like dividing
+     up memory by percentages in esx except that we don't need an idle
+     tax since CPU switches when idle.
+
+   initial dip: only happens at higher rate, they posit it is because
+   transport fills up.
+
+   no packet
+
+   could have been just over, but get extra 1ms of work in (checks
+   at end if you are ok at beginning)

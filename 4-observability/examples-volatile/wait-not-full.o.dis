@@ -1,0 +1,17 @@
+
+wait-not-full.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <mb_wait_notfull>:
+   0:	e59f3010 	ldr	r3, [pc, #16]	; 18 <mb_wait_notfull+0x18>
+   4:	e5933000 	ldr	r3, [r3]
+   8:	e5933018 	ldr	r3, [r3, #24]
+   c:	e3530000 	cmp	r3, #0
+  10:	a12fff1e 	bxge	lr
+  14:	eafffffe 	b	14 <mb_wait_notfull+0x14>
+  18:	00000000 	.word	0x00000000
+
+0000001c <notmain>:
+  1c:	e12fff1e 	bx	lr

@@ -1,0 +1,16 @@
+
+10-pointer.o:     file format elf32-littlearm
+
+
+Disassembly of section .text.startup:
+
+00000000 <main>:
+   0:	e92d4010 	push	{r4, lr}
+   4:	e3a00004 	mov	r0, #4
+   8:	ebfffffe 	bl	0 <ialloc>
+   c:	e3a0200a 	mov	r2, #10
+  10:	e1a03000 	mov	r3, r0
+  14:	e8bd4010 	pop	{r4, lr}
+  18:	e3a00000 	mov	r0, #0
+  1c:	e5832000 	str	r2, [r3]
+  20:	e12fff1e 	bx	lr

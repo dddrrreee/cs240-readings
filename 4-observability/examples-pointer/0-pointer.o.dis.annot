@@ -1,0 +1,31 @@
+
+0-pointer.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <foo>:
+// warm-up: what will the compiler do?
+void foo(void) {
+    int i = 0;
+    return;
+}
+   0:	e12fff1e 	bx	lr
+
+00000004 <bar>:
+    int y = 4;
+    int z = 5;
+    int w = 6;
+
+    return x*y+z*w;
+}
+   4:	e3a0002a 	mov	r0, #42	; 0x2a
+   8:	e12fff1e 	bx	lr
+
+0000000c <mul16>:
+
+unsigned mul16(unsigned x) {
+    return x * 16;
+}
+   c:	e1a00200 	lsl	r0, r0, #4
+  10:	e12fff1e 	bx	lr

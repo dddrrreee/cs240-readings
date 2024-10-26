@@ -1,0 +1,27 @@
+
+5-fb.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <write_mailbox_x>:
+   0:	e5903018 	ldr	r3, [r0, #24]
+   4:	e3530000 	cmp	r3, #0
+   8:	bafffffc 	blt	0 <write_mailbox_x>
+   c:	e3a02000 	mov	r2, #0
+  10:	e59f3034 	ldr	r3, [pc, #52]	; 4c <write_mailbox_x+0x4c>
+  14:	e1831001 	orr	r1, r3, r1
+  18:	e3811101 	orr	r1, r1, #1073741824	; 0x40000000
+  1c:	e3a0c020 	mov	ip, #32
+  20:	e5832020 	str	r2, [r3, #32]
+  24:	e5801020 	str	r1, [r0, #32]
+  28:	e3a00c05 	mov	r0, #1280	; 0x500
+  2c:	e3a01d0f 	mov	r1, #960	; 0x3c0
+  30:	e583201c 	str	r2, [r3, #28]
+  34:	e8830003 	stm	r3, {r0, r1}
+  38:	e5830008 	str	r0, [r3, #8]
+  3c:	e583100c 	str	r1, [r3, #12]
+  40:	e5832018 	str	r2, [r3, #24]
+  44:	e583c014 	str	ip, [r3, #20]
+  48:	e12fff1e 	bx	lr
+  4c:	00000000 	.word	0x00000000
